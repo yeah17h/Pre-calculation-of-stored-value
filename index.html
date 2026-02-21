@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>儲值金額試算</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;700;900&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --surface2: #16080f;
+    --red: #c2185b;
+    --red-bright: #ff4fa3;
+    --red-glow: #ff4fa355;
+    --red-dim: #6a0f3a;
+    --gold: #c9a84c;
+    --text: #e8e0d8;
+    --text-dim: #9e6e8a;
+    --border: #2a0818;
+    --border-active: #a01060;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans TC', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(180,0,100,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(180,0,100,0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 40px 20px 80px;
+  }
+  header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+  header::after {
+    content: '';
+    display: block;
+    width: 200px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--red), transparent);
+    margin: 20px auto 0;
+  }
+  .title-label {
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    letter-spacing: 6px;
+    color: var(--red);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    opacity: 0.8;
+  }
+  h1 {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(22px, 4vw, 36px);
+    font-weight: 900;
+    color: var(--text);
+    letter-spacing: 2px;
+    line-height: 1.2;
+  }
+  h1 span { color: var(--red-bright); text-shadow: 0 0 20px var(--red-glow); }
+  .subtitle { margin-top: 8px; font-size: 12px; color: var(--text-dim); letter-spacing: 3px; }
+
+  .rate-bar {
+    background: var(--surface2);
+    border: 1px solid var(--border-active);
+    border-radius: 4px;
+    padding: 14px 20px;
+    margin-bottom: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    box-shadow: inset 0 0 30px rgba(180,0,0,0.05);
+  }
+  .rate-info { font-size: 12px; color: var(--text-dim); letter-spacing: 1px; }
+  .rate-value { font-family: 'Orbitron', monospace; font-size: 14px; color: var(--gold); font-weight: 700; }
+  .refresh-btn {
+    background: var(--bg);
+    border: 1px solid var(--border-active);
+    color: var(--red-bright);
+    font-family: 'Noto Sans TC', sans-serif;
+    font-size: 11px;
+    letter-spacing: 1px;
+    padding: 4px 14px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.15s;
+  }
+  .refresh-btn:hover { background: var(--red); color: white; box-shadow: 0 0 12px var(--red-glow); }
+
+  .items-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+    margin-bottom: 36px;
+  }
+
+  .item-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .item-card.selected {
+    border-color: var(--red-bright);
+    box-shadow: 0 0 18px var(--red-glow);
+  }
+
+  /* Top = clickable toggle area */
+  .card-top {
+    padding: 16px 16px 12px;
+    cursor: pointer;
+    position: relative;
+    user-select: none;
+    transition: background 0.2s;
+  }
+  .card-top:hover { background: rgba(180,0,100,0.07); }
+  .item-card.selected .card-top { background: rgba(180,0,100,0.09); }
+
+  .item-check {
+    position: absolute;
+    top: 10px; right: 10px;
+    width: 18px; height: 18px;
+    border: 1px solid var(--red-dim);
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: transparent;
+    transition: all 0.2s;
+  }
+  .item-card.selected .item-check {
+    background: var(--red);
+    border-color: var(--red-bright);
+    color: white;
+    box-shadow: 0 0 12px var(--red-glow);
+  }
+  .item-twd { font-family: 'Orbitron', monospace; font-size: 22px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+  .item-twd-unit { font-size: 10px; color: var(--red); letter-spacing: 2px; }
+
+  /* Bottom qty row — always visible, isolated from card-top */
+  .card-qty {
+    display: flex;
+    align-items: stretch;
+    border-top: 1px solid var(--border);
+    background: #0d0d0d;
+    height: 36px;
+  }
+  .qty-btn {
+    flex: 0 0 36px;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    color: var(--text-dim);
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s, background 0.15s;
+  }
+  .qty-btn:hover { color: var(--red-bright); background: rgba(200,0,120,0.14); }
+  .qty-btn:active { background: rgba(200,0,120,0.28); }
+  .qty-display {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Orbitron', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    pointer-events: none;
+  }
+
+  /* Summary */
+  .summary {
+    background: rgba(10, 2, 8, 0.97);
+    backdrop-filter: blur(24px) saturate(1.6);
+    -webkit-backdrop-filter: blur(24px) saturate(1.6);
+    border: 1px solid rgba(180, 0, 100, 0.45);
+    border-top: 1px solid rgba(255, 80, 180, 0.2);
+    border-radius: 8px;
+    padding: 24px 28px;
+    position: sticky;
+    bottom: 20px;
+    z-index: 100;
+    box-shadow:
+      0 0 0 1px rgba(0,0,0,1),
+      0 -4px 32px rgba(0,0,0,1),
+      0 0 40px rgba(180,0,100,0.2),
+      0 20px 60px rgba(0,0,0,1),
+      inset 0 1px 0 rgba(255,100,180,0.07);
+  }
+  .summary-title { font-family: 'Orbitron', monospace; font-size: 10px; letter-spacing: 4px; color: var(--red); margin-bottom: 16px; text-transform: uppercase; }
+  .summary-items { min-height: 40px; margin-bottom: 16px; }
+  .summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    font-size: 13px;
+    animation: fadeIn 0.2s ease;
+  }
+  @keyframes fadeIn { from { opacity:0; transform:translateX(-4px); } to { opacity:1; transform:translateX(0); } }
+  .s-name { color: var(--text); }
+  .s-twd  { font-family: 'Orbitron', monospace; color: var(--text); font-size: 12px; }
+  .empty-msg { color: var(--text-dim); font-size: 12px; text-align: center; padding: 8px 0; opacity: 0.5; letter-spacing: 2px; }
+  .divider { height: 1px; background: linear-gradient(90deg, transparent, var(--red-dim), transparent); margin: 16px 0; }
+  .total-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+  .total-label { font-family: 'Orbitron', monospace; font-size: 11px; letter-spacing: 3px; color: var(--red); }
+  .total-twd { font-family: 'Orbitron', monospace; font-size: 28px; font-weight: 900; color: var(--text); line-height: 1; }
+  .total-twd .currency { font-size: 14px; color: var(--red-bright); margin-right: 4px; }
+  .note { margin-top: 10px; font-size: 10px; color: var(--text-dim); letter-spacing: 1px; opacity: 0.6; text-align: right; }
+  .reset-btn {
+    background: transparent;
+    border: 1px solid var(--border-active);
+    color: var(--text-dim);
+    font-family: 'Noto Sans TC', sans-serif;
+    font-size: 11px;
+    padding: 6px 16px;
+    cursor: pointer;
+    border-radius: 2px;
+    letter-spacing: 2px;
+    transition: all 0.2s;
+    margin-top: 14px;
+    width: 100%;
+  }
+  .reset-btn:hover { border-color: var(--red-bright); color: var(--red-bright); box-shadow: 0 0 12px var(--red-glow); }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="title-label">I Want To Earn Credit Card Rewards</div>
+    <h1>Ayas<br><span>儲值金額試算器</span></h1>
+    <div class="subtitle">你開心 × 我開心 × 大家都開心</div>
+  </header>
+
+  <div class="rate-bar">
+    <div>
+      <div class="rate-info">即時匯率（JPY → TWD）</div>
+      <div class="rate-value" id="rateDisplay">載入中...</div>
+    </div>
+    <button class="refresh-btn" onclick="fetchRate()">↻ 更新</button>
+  </div>
+
+  <div class="items-grid" id="itemsGrid"></div>
+
+  <div class="summary">
+    <div class="summary-title">◆ 結帳明細</div>
+    <div class="summary-items" id="summaryItems">
+      <div class="empty-msg">尚未選擇任何品項</div>
+    </div>
+    <div class="divider"></div>
+    <div class="total-row">
+      <div class="total-label">預估總金額</div>
+      <div class="total-twd"><span class="currency">TWD</span><span id="totalTwd">—</span></div>
+    </div>
+    <button class="reset-btn" onclick="resetAll()">全部清除</button>
+  </div>
+
+</div>
+<script>
+const ITEMS = [
+  { twd: 33,    jpy: 120   },
+  { twd: 90,    jpy: 400   },
+  { twd: 170,   jpy: 610   },
+  { twd: 330,   jpy: 1220  },
+  { twd: 490,   jpy: 1840  },
+  { twd: 670,   jpy: 2480  },
+  { twd: 830,   jpy: 3100  },
+  { twd: 990,   jpy: 3680  },
+  { twd: 1290,  jpy: 5100  },
+  { twd: 1690,  jpy: 6100  },
+  { twd: 3290,  jpy: 12000 },
+];
+
+let jpyTwdRate = null;
+const state = ITEMS.map(() => ({ selected: false, qty: 1 }));
+
+async function fetchRate() {
+  document.getElementById('rateDisplay').textContent = '更新中...';
+  const apis = [
+    () => fetch('https://open.er-api.com/v6/latest/JPY').then(r=>r.json()).then(d=>d.rates.TWD),
+    () => fetch('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/jpy.json').then(r=>r.json()).then(d=>d.jpy.twd),
+    () => fetch('https://api.frankfurter.app/latest?from=JPY&to=TWD').then(r=>r.json()).then(d=>d.rates.TWD),
+  ];
+  for (const api of apis) {
+    try {
+      const rate = await api();
+      if (rate > 0) {
+        jpyTwdRate = rate;
+        document.getElementById('rateDisplay').textContent = '1 JPY \u2248 TWD ' + rate.toFixed(4);
+        recalc();
+        return;
+      }
+    } catch(e) {}
+  }
+  document.getElementById('rateDisplay').textContent = '\u7372\u53d6\u5931\u6557\uff0c\u8acb\u91cd\u8a66';
+  document.getElementById('rateNote').textContent = '\u7121\u6cd5\u53d6\u5f97\u5373\u6642\u532f\u7387';
+}
+
+function buildGrid() {
+  const grid = document.getElementById('itemsGrid');
+  ITEMS.forEach((item, i) => {
+    const card = document.createElement('div');
+    card.className = 'item-card';
+    card.id = 'card-' + i;
+
+    // Top section — toggle selection
+    const top = document.createElement('div');
+    top.className = 'card-top';
+    top.innerHTML =
+      '<div class="item-check" id="check-' + i + '">\u2713</div>' +
+      '<div class="item-twd">' + item.twd.toLocaleString() + '</div>' +
+      '<div class="item-twd-unit">TWD</div>';
+    top.addEventListener('click', function() { toggleItem(i); });
+
+    // Bottom section — qty controls (completely separate from top)
+    const qtyRow = document.createElement('div');
+    qtyRow.className = 'card-qty';
+
+    const minus = document.createElement('button');
+    minus.className = 'qty-btn';
+    minus.type = 'button';
+    minus.textContent = '\u2212';
+
+    const disp = document.createElement('div');
+    disp.className = 'qty-display';
+    disp.id = 'disp-' + i;
+    disp.textContent = '1';
+
+    const plus = document.createElement('button');
+    plus.className = 'qty-btn';
+    plus.type = 'button';
+    plus.textContent = '+';
+
+    // Use closure properly with IIFE to capture i
+    (function(idx, dispEl) {
+      minus.addEventListener('click', function(e) {
+        e.stopPropagation();
+        if (state[idx].qty > 1) {
+          state[idx].qty--;
+          dispEl.textContent = state[idx].qty;
+          recalc();
+        }
+      });
+      plus.addEventListener('click', function(e) {
+        e.stopPropagation();
+        if (state[idx].qty < 99) {
+          state[idx].qty++;
+          dispEl.textContent = state[idx].qty;
+          recalc();
+        }
+      });
+    })(i, disp);
+
+    qtyRow.appendChild(minus);
+    qtyRow.appendChild(disp);
+    qtyRow.appendChild(plus);
+
+    card.appendChild(top);
+    card.appendChild(qtyRow);
+    grid.appendChild(card);
+  });
+}
+
+function toggleItem(i) {
+  state[i].selected = !state[i].selected;
+  document.getElementById('card-' + i).classList.toggle('selected', state[i].selected);
+  recalc();
+}
+
+function recalc() {
+  var rate = jpyTwdRate ? jpyTwdRate * 1.0815 : null;
+  var totalTwd = 0;
+  var rows = [];
+  state.forEach(function(s, i) {
+    if (!s.selected) return;
+    var jpy = ITEMS[i].jpy * s.qty;
+    var twd = rate ? jpy * rate : null;
+    if (twd) totalTwd += twd;
+    rows.push({ twd: ITEMS[i].twd, qty: s.qty, calcTwd: twd });
+  });
+  var el = document.getElementById('summaryItems');
+  if (rows.length === 0) {
+    el.innerHTML = '<div class="empty-msg">\u5c1a\u672a\u9078\u64c7\u4efb\u4f55\u54c1\u9805</div>';
+  } else {
+    el.innerHTML = rows.map(function(r) {
+      return '<div class="summary-row"><span class="s-name">TWD ' + r.twd.toLocaleString() + ' \u00d7 ' + r.qty + '</span><span class="s-twd">' + (r.calcTwd ? 'TWD ' + Math.round(r.calcTwd).toLocaleString() : '\u2014') + '</span></div>';
+    }).join('');
+  }
+  document.getElementById('totalTwd').textContent = (rate && rows.length) ? Math.round(totalTwd).toLocaleString() : '\u2014';
+}
+
+function resetAll() {
+  state.forEach(function(s, i) {
+    s.selected = false; s.qty = 1;
+    document.getElementById('card-' + i).classList.remove('selected');
+    document.getElementById('disp-' + i).textContent = '1';
+  });
+  recalc();
+}
+
+buildGrid();
+fetchRate();
+</script>
+</body>
+</html>
